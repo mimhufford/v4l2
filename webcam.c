@@ -135,17 +135,20 @@ int main(int argc, char** argv) {
     }
 
     // Set up the main loop to display frames
-    SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
+    SetTraceLogLevel(LOG_WARNING);
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST | FLAG_VSYNC_HINT);
     InitWindow(WIDTH, HEIGHT, "Webcam");
     float scale = 1.0f;
     bool show_stats = false;
     
     int monitor_id = GetCurrentMonitor();
     SetTargetFPS(GetMonitorRefreshRate(monitor_id));
-
+    
     Image temporary_image = GenImageColor(WIDTH, HEIGHT, BLUE);
     ImageFormat(&temporary_image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+    ImageMipmaps(&temporary_image);
     Texture2D texture = LoadTextureFromImage(temporary_image);
+    UnloadImage(temporary_image);
     
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_MINUS)) { scale -= 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
@@ -203,6 +206,7 @@ int main(int argc, char** argv) {
 
         // Upload to the GPU
         UpdateTexture(texture, image);
+        GenTextureMipmaps(&texture);
 
         // Draw it
         Rectangle src = {0, 0, WIDTH, HEIGHT};
