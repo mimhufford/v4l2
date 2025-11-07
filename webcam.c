@@ -9,8 +9,8 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
-#define WIDTH 800
-#define HEIGHT 600
+#define WIDTH 640
+#define HEIGHT 480
 
 static int xioctl(int fd, int request, void *arg)
 {
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
     }
 
     if (format.fmt.pix.width != WIDTH || format.fmt.pix.height != HEIGHT) {
-        fprintf(stderr, "ERROR: Could not set device to use 800x600 format.\n");
+        fprintf(stderr, "ERROR: Could not set device to %dx%d resolution.\n", WIDTH, HEIGHT);
         return -1;
     }
 
