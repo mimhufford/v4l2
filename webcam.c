@@ -25,7 +25,7 @@ static int xioctl(int fd, int request, void *arg)
 
 int main(int argc, char** argv) {
     char *device = "/dev/video0";
-    
+
     // Open the device
     int fd = open(device, O_RDWR);
 
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
             return -1;
         }
     }
-        
+
     // Start capturing
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (xioctl(fd, VIDIOC_STREAMON, &type) == -1) {
@@ -136,27 +136,26 @@ int main(int argc, char** argv) {
 
     // Set up the main loop to display frames
     SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST | FLAG_VSYNC_HINT);
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST | FLAG_VSYNC_HINT | FLAG_WINDOW_TRANSPARENT);
     InitWindow(WIDTH, HEIGHT, "Webcam");
     float scale = 1.0f;
     bool show_stats = false;
-    
+
     int monitor_id = GetCurrentMonitor();
     SetTargetFPS(GetMonitorRefreshRate(monitor_id));
-    
+
     Image temporary_image = GenImageColor(WIDTH, HEIGHT, BLUE);
     ImageFormat(&temporary_image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
     ImageMipmaps(&temporary_image);
     Texture2D texture = LoadTextureFromImage(temporary_image);
     UnloadImage(temporary_image);
-    
+
     while (!WindowShouldClose()) {
-        if (IsKeyPressed(KEY_MINUS)) { scale -= 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
-        if (IsKeyPressed(KEY_EQUAL)) { scale += 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
+        if (IsKeyPressed(KEY_MINUS)) { scale = fmaxf(scale - 0.1f, 0.3f); SetWindowSize(WIDTH * scale, HEIGHT * scale); }
+        if (IsKeyPressed(KEY_EQUAL)) { scale = fminf(scale + 0.1f, 1.0f); SetWindowSize(WIDTH * scale, HEIGHT * scale); }
         if (IsKeyPressed(KEY_F1)) { show_stats = !show_stats; }
 
         BeginDrawing();
-        ClearBackground(BLACK);
 
         // Dequeue a buffer
         struct v4l2_buffer buffer = {0};
@@ -170,7 +169,7 @@ int main(int argc, char** argv) {
         // Grab the data
         void *data = pointers[buffer.index];
         unsigned int data_length = buffer.bytesused;
-        
+
         // Convert the data to RGB
         unsigned char image[WIDTH*HEIGHT*3] = {0};
 
@@ -184,7 +183,7 @@ int main(int argc, char** argv) {
             float r1 = 1.164f * (y1 - 16) + 1.596f * (cr - 128);
             float g1 = 1.164f * (y1 - 16) + 0.813f * (cr - 128) - 0.391f * (cb - 128);
             float b1 = 1.164f * (y1 - 16) + 2.018f * (cb - 128);
-            
+
             float r2 = 1.164f * (y2 - 16) + 1.596f * (cr - 128);
             float g2 = 1.164f * (y2 - 16) + 0.813f * (cr - 128) - 0.391f * (cb - 128);
             float b2 = 1.164f * (y2 - 16) + 2.018f * (cb - 128);
@@ -210,7 +209,7 @@ int main(int argc, char** argv) {
 
         // Draw it
         Rectangle src = {0, 0, WIDTH, HEIGHT};
-        Rectangle dst = {0, 0, GetRenderWidth(), GetRenderHeight()};
+        Rectangle dst = {0, 0, WIDTH * scale, HEIGHT * scale};
         DrawTexturePro(texture, src, dst, (Vector2){0}, 0, WHITE);
 
         if (show_stats) {
