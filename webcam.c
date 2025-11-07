@@ -8,7 +8,7 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <raylib.h>
 #include "stb_image_write.h"
 
 #define WIDTH 800
@@ -210,6 +210,17 @@ int main(int argc, char** argv) {
         fprintf(stderr, "ERROR: Could not close %s.\n", device);
         return -1;
     }
+
+    InitWindow(800, 600, "Webcam");
+
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(RED);
+        EndDrawing();
+    }
+
+    CloseWindow();
+
 
     return 0;
 }
