@@ -138,6 +138,7 @@ int main(int argc, char** argv) {
     SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
     InitWindow(WIDTH, HEIGHT, "Webcam");
     float scale = 1.0f;
+    bool show_stats = false;
     
     int monitor_id = GetCurrentMonitor();
     SetTargetFPS(GetMonitorRefreshRate(monitor_id));
@@ -149,6 +150,7 @@ int main(int argc, char** argv) {
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_MINUS)) { scale -= 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
         if (IsKeyPressed(KEY_EQUAL)) { scale += 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
+        if (IsKeyPressed(KEY_F1)) { show_stats = !show_stats; }
 
         BeginDrawing();
         ClearBackground(BLACK);
@@ -206,7 +208,11 @@ int main(int argc, char** argv) {
         Rectangle src = {0, 0, WIDTH, HEIGHT};
         Rectangle dst = {0, 0, GetRenderWidth(), GetRenderHeight()};
         DrawTexturePro(texture, src, dst, (Vector2){0}, 0, WHITE);
-        DrawFPS(25, 25);
+
+        if (show_stats) {
+            DrawFPS(25, 25);
+        }
+
         EndDrawing();
     }
 
