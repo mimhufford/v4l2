@@ -135,7 +135,9 @@ int main(int argc, char** argv) {
     }
 
     // Set up the main loop to display frames
+    SetConfigFlags(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
     InitWindow(WIDTH, HEIGHT, "Webcam");
+    float scale = 1.0f;
     
     int monitor_id = GetCurrentMonitor();
     SetTargetFPS(GetMonitorRefreshRate(monitor_id));
@@ -145,8 +147,11 @@ int main(int argc, char** argv) {
     Texture2D texture = LoadTextureFromImage(temporary_image);
     
     while (!WindowShouldClose()) {
+        if (IsKeyPressed(KEY_MINUS)) { scale -= 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
+        if (IsKeyPressed(KEY_EQUAL)) { scale += 0.1f; SetWindowSize(WIDTH * scale, HEIGHT * scale); }
+
         BeginDrawing();
-        ClearBackground(RED);
+        ClearBackground(BLACK);
 
         // Dequeue a buffer
         struct v4l2_buffer buffer = {0};
@@ -198,7 +203,9 @@ int main(int argc, char** argv) {
         UpdateTexture(texture, image);
 
         // Draw it
-        DrawTexture(texture, 0, 0, WHITE);
+        Rectangle src = {0, 0, WIDTH, HEIGHT};
+        Rectangle dst = {0, 0, GetRenderWidth(), GetRenderHeight()};
+        DrawTexturePro(texture, src, dst, (Vector2){0}, 0, WHITE);
         DrawFPS(25, 25);
         EndDrawing();
     }
