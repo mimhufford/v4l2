@@ -2,14 +2,12 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <raylib.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
-
-#include <raylib.h>
-#include "stb_image_write.h"
 
 #define WIDTH 800
 #define HEIGHT 600
@@ -178,18 +176,12 @@ int main(int argc, char** argv) {
             image[(i/2 + 1) * 3 + 2] = fmaxf(fminf(r2, 255.0f), 0.0f);
         }
 
-        // Write it out as a test image
-        stbi_write_bmp("test.bmp", WIDTH, HEIGHT, 3, image);
-
-
         // Requeue the buffer
         if (xioctl(fd, VIDIOC_QBUF, &buffers[buffer.index]) == -1) {
             fprintf(stderr, "ERROR: Could not reenqueue buffer.\n");
             return -1;
         }
     // }
-
-
 
     // Stop capturing
     if (xioctl(fd, VIDIOC_STREAMOFF, &type) == -1) {
@@ -211,16 +203,22 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    InitWindow(800, 600, "Webcam");
+    // TEMPORARY: display the one captured frame
+    InitWindow(WIDTH, HEIGHT, "Webcam");
+
+    Image temporary_image = GenImageColor(WIDTH, HEIGHT, BLUE);
+    ImageFormat(&temporary_image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+    Texture2D texture = LoadTextureFromImage(temporary_image);
+    UpdateTexture(texture, image);
 
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(RED);
+        DrawTexture(texture, 0, 0, WHITE);
         EndDrawing();
     }
 
     CloseWindow();
-
 
     return 0;
 }
