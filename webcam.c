@@ -134,8 +134,20 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    // TODO: loop, but for now try capturing a single frame
-    // {
+    // Set up the main loop to display frames
+    InitWindow(WIDTH, HEIGHT, "Webcam");
+    
+    int monitor_id = GetCurrentMonitor();
+    SetTargetFPS(GetMonitorRefreshRate(monitor_id));
+
+    Image temporary_image = GenImageColor(WIDTH, HEIGHT, BLUE);
+    ImageFormat(&temporary_image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+    Texture2D texture = LoadTextureFromImage(temporary_image);
+    
+    while (!WindowShouldClose()) {
+        BeginDrawing();
+        ClearBackground(RED);
+
         // Dequeue a buffer
         struct v4l2_buffer buffer = {0};
         buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -181,7 +193,18 @@ int main(int argc, char** argv) {
             fprintf(stderr, "ERROR: Could not reenqueue buffer.\n");
             return -1;
         }
-    // }
+
+        // Upload to the GPU
+        UpdateTexture(texture, image);
+
+        // Draw it
+        DrawTexture(texture, 0, 0, WHITE);
+        DrawFPS(25, 25);
+        EndDrawing();
+    }
+
+    // Close down raylib
+    CloseWindow();
 
     // Stop capturing
     if (xioctl(fd, VIDIOC_STREAMOFF, &type) == -1) {
@@ -202,23 +225,6 @@ int main(int argc, char** argv) {
         fprintf(stderr, "ERROR: Could not close %s.\n", device);
         return -1;
     }
-
-    // TEMPORARY: display the one captured frame
-    InitWindow(WIDTH, HEIGHT, "Webcam");
-
-    Image temporary_image = GenImageColor(WIDTH, HEIGHT, BLUE);
-    ImageFormat(&temporary_image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
-    Texture2D texture = LoadTextureFromImage(temporary_image);
-    UpdateTexture(texture, image);
-
-    while (!WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(RED);
-        DrawTexture(texture, 0, 0, WHITE);
-        EndDrawing();
-    }
-
-    CloseWindow();
 
     return 0;
 }
