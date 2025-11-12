@@ -3,45 +3,22 @@
 #import "Video_For_Linux";
 #load "raylib.jai";
 
-WIDTH :: 640;
+WIDTH  :: 640;
 HEIGHT :: 480;
+DEVICE :: "/dev/video0";
 
 main :: () {
-    device := "/dev/video0";
-
     // Open the device
-    fd := open(device.data, O_RDWR);
+    fd := open(DEVICE.data, O_RDWR);
 
-    if (fd == -1) {
-        print("ERROR: Could not open %.\n", device);
-        return;
-    }
-
-    defer {
-        // Close the device
-        if (close(fd) == -1) {
-            print("ERROR: Could not close %.\n", device);
-            return;
-        }
-    }
+    check_ge_0(fd, tprint("Could not open %", DEVICE));
 
     // Check the device has the correct capabilities
     capability : v4l2_capability;
 
-    if (ioctl(fd, VIDIOC_QUERYCAP, *capability) < 0) {
-        print("ERROR: Could not read device capabilities.\n");
-        return;
-    }
-
-    if (!(capability.capabilities & V4L2_CAP.VIDEO_CAPTURE.(u32))) {
-        print("ERROR: Device can not be used for capture.\n");
-        return;
-    }
-
-    if (!(capability.capabilities & V4L2_CAP.STREAMING.(u32))) {
-        print("ERROR: Device does not support streaming.\n");
-        return;
-    }
+    check_ge_0(ioctl(fd, VIDIOC_QUERYCAP, *capability), "Could not read device capabilities");
+    check_gt_0(capability.capabilities & V4L2_CAP.VIDEO_CAPTURE.(u32), "Device can not be used for capture");
+    check_gt_0(capability.capabilities & V4L2_CAP.STREAMING.(u32), "Device does not support streaming");
 
     // Set the desired width, height, and pixel format
     format : v4l2_format;
@@ -51,25 +28,10 @@ main :: () {
     format.fmt.pix.width = WIDTH;
     format.fmt.pix.height = HEIGHT;
 
-    if (ioctl(fd, VIDIOC_S_FMT, *format) < 0) {
-        print("ERROR: Could not set desired format.\n");
-        return;
-    }
-
-    if (format.type != .VIDEO_CAPTURE) {
-        print("ERROR: Could not set device to capture mode.\n");
-        return;
-    }
-
-    if (format.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV) {
-        print("ERROR: Could not set device to use YUYV format.\n");
-        return;
-    }
-
-    if (format.fmt.pix.width != WIDTH || format.fmt.pix.height != HEIGHT) {
-        print("ERROR: Could not set device to %x% resolution.\n", WIDTH, HEIGHT);
-        return;
-    }
+    check_ge_0(ioctl(fd, VIDIOC_S_FMT, *format), "Could not set desired format");
+    check_true(format.type == .VIDEO_CAPTURE, "Could not set device to capture mode");
+    check_true(format.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV, "Could not set device to use YUYV format");
+    check_true(format.fmt.pix.width == WIDTH && format.fmt.pix.height == HEIGHT, tprint("Could not set device to %x% resolution", WIDTH, HEIGHT));
 
     // Setup request buffers
     request_buffers : v4l2_requestbuffers;
@@ -77,15 +39,8 @@ main :: () {
     request_buffers.memory = .MMAP;
     request_buffers.count = 4;
 
-    if (ioctl(fd, VIDIOC_REQBUFS, *request_buffers) < 0) {
-        print("ERROR: Could not request buffers.\n");
-        return;
-    }
-
-    if (request_buffers.count != 4) {
-        print("ERROR: Could not request a buffer count of 4.\n");
-        return;
-    }
+    check_ge_0(ioctl(fd, VIDIOC_REQBUFS, *request_buffers), "Could not request buffers");
+    check_true(request_buffers.count == 4, "Could not request a buffer count of 4");
 
     // Map the buffers
     buffers : [4]v4l2_buffer;
@@ -96,57 +51,24 @@ main :: () {
         buffers[it].memory = .MMAP;
         buffers[it].index = it;
 
-        if (ioctl(fd, VIDIOC_QUERYBUF, *buffers[it]) < 0) {
-            print("ERROR: Could not query buffers.\n");
-            return;
-        }
-
+        check_ge_0(ioctl(fd, VIDIOC_QUERYBUF, *buffers[it]), "Could not query buffers");
         pointers[it] = mmap(null, buffers[it].length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buffers[it].m.offset);
-
-        if (pointers[it] == MAP_FAILED) {
-            print("ERROR: Could not mmap buffers.\n");
-            return;
-        }
-    }
-
-    defer {
-        // Unmap the buffers
-        for 0..request_buffers.count-1 {
-            if (munmap(pointers[it], buffers[it].length) == -1) {
-                print("ERROR: Could not munmap buffers.\n");
-                return;
-            }
-        }
+        check_true(pointers[it] != MAP_FAILED, "Could not mmap buffers");
     }
 
     // Prepare for capturing
     for 0..request_buffers.count-1 {
-        if (ioctl(fd, VIDIOC_QBUF, *buffers[it]) < 0) {
-            print("ERROR: Could not enqueue buffers.\n");
-            return;
-        }
+        check_ge_0(ioctl(fd, VIDIOC_QBUF, *buffers[it]), "Could not enqueue buffers");
     }
 
     // Start capturing
     type := v4l2_buf_type.VIDEO_CAPTURE;
-    if (ioctl(fd, VIDIOC_STREAMON, *type) < 0) {
-        print("ERROR: Could not start capturing.\n");
-        return;
-    }
-
-    defer {
-        // Stop capturing
-        if (ioctl(fd, VIDIOC_STREAMOFF, *type) < 0) {
-            print("ERROR: Could not stop capturing.\n");
-            return;
-        }
-    }
+    check_ge_0(ioctl(fd, VIDIOC_STREAMON, *type), "Could not start capturing");
 
     // Set up the main loop to display frames
     SetTraceLogLevel(.WARNING);
     SetConfigFlags(.WINDOW_UNDECORATED | .WINDOW_TOPMOST | .VSYNC_HINT | .WINDOW_TRANSPARENT);
     InitWindow(WIDTH, HEIGHT, "Webcam");
-    defer CloseWindow();
 
     scale := 1.0;
     show_stats := false;
@@ -171,10 +93,7 @@ main :: () {
         buffer : v4l2_buffer;
         buffer.type = .VIDEO_CAPTURE;
         buffer.memory = .MMAP;
-        if (ioctl(fd, VIDIOC_DQBUF, *buffer) < 0) {
-            print("ERROR: Could not dequeue a buffer.\n");
-            return;
-        }
+        check_ge_0(ioctl(fd, VIDIOC_DQBUF, *buffer), "Could not dequeue a buffer");
 
         // Grab the data
         data := pointers[buffer.index];
@@ -183,14 +102,9 @@ main :: () {
         // Convert the data to RGB
         image : [WIDTH * HEIGHT * 3]u8;
 
-        for 0..(data_length-1)/4 {
-            i := it * 4;
-
-            bytes := (data + i).(*u8);
-            y1 := bytes[0];
-            cr := bytes[1];
-            y2 := bytes[2];
-            cb := bytes[3];
+        for i: 0..(data_length-1)/4 {
+            bytes := (data + i * 4).(*u8);
+            y1, cr, y2, cb := bytes[0], bytes[1], bytes[2], bytes[3];
 
             r1 := 1.164 * (y1 - 16.0) + 1.596 * (cr - 128.0);
             g1 := 1.164 * (y1 - 16.0) + 0.813 * (cr - 128.0) - 0.391 * (cb - 128.0);
@@ -200,20 +114,17 @@ main :: () {
             g2 := 1.164 * (y2 - 16.0) + 0.813 * (cr - 128.0) - 0.391 * (cb - 128.0);
             b2 := 1.164 * (y2 - 16.0) + 2.018 * (cb - 128.0);
 
-            image[(i/2 + 0) * 3 + 0] = clamp(b1, 0.0, 255.0).(u8);
-            image[(i/2 + 0) * 3 + 1] = clamp(g1, 0.0, 255.0).(u8);
-            image[(i/2 + 0) * 3 + 2] = clamp(r1, 0.0, 255.0).(u8);
+            image[(i*2 + 0) * 3 + 0] = clamp(b1, 0.0, 255.0).(u8);
+            image[(i*2 + 0) * 3 + 1] = clamp(g1, 0.0, 255.0).(u8);
+            image[(i*2 + 0) * 3 + 2] = clamp(r1, 0.0, 255.0).(u8);
 
-            image[(i/2 + 1) * 3 + 0] = clamp(b2, 0.0, 255.0).(u8);
-            image[(i/2 + 1) * 3 + 1] = clamp(g2, 0.0, 255.0).(u8);
-            image[(i/2 + 1) * 3 + 2] = clamp(r2, 0.0, 255.0).(u8);
+            image[(i*2 + 1) * 3 + 0] = clamp(b2, 0.0, 255.0).(u8);
+            image[(i*2 + 1) * 3 + 1] = clamp(g2, 0.0, 255.0).(u8);
+            image[(i*2 + 1) * 3 + 2] = clamp(r2, 0.0, 255.0).(u8);
         }
 
         // Requeue the buffer
-        if (ioctl(fd, VIDIOC_QBUF, *buffers[buffer.index]) < 0) {
-            print("ERROR: Could not reenqueue buffer.\n");
-            return;
-        }
+        check_ge_0(ioctl(fd, VIDIOC_QBUF, *buffers[buffer.index]), "Could not reenqueue buffer");
 
         // Upload to the GPU
         UpdateTexture(texture, image.data);
@@ -230,4 +141,35 @@ main :: () {
 
         EndDrawing();
     }
+
+    CloseWindow();
+
+    // Stop capturing
+    check_ge_0(ioctl(fd, VIDIOC_STREAMOFF, *type), "Could not stop capturing");
+
+    // Unmap the buffers
+    for 0..request_buffers.count-1 {
+        check_ge_0(munmap(pointers[it], buffers[it].length), "Could not munmap buffers");
+    }
+
+    // Close the device
+    check_ge_0(close(fd), tprint("Could not close %", DEVICE));
+}
+
+check_ge_0 :: (value: s32, message: string) {
+    if value >= 0 return;
+    print("ERROR: %.\n", message);
+    exit(0);
+}
+
+check_gt_0 :: (value: u32, message: string) {
+    if value > 0 return;
+    print("ERROR: %.\n", message);
+    exit(0);
+}
+
+check_true :: (value: bool, message: string) {
+    if value return;
+    print("ERROR: %.\n", message);
+    exit(0);
 }
