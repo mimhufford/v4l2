@@ -17,8 +17,8 @@ main :: () {
     capability : v4l2_capability;
 
     check_ge_0(ioctl(fd, VIDIOC_QUERYCAP, *capability), "Could not read device capabilities");
-    check_gt_0(capability.capabilities & V4L2_CAP.VIDEO_CAPTURE.(u32), "Device can not be used for capture");
-    check_gt_0(capability.capabilities & V4L2_CAP.STREAMING.(u32), "Device does not support streaming");
+    check_true(capability.capabilities & V4L2_CAP.VIDEO_CAPTURE.(u32) != 0, "Device can not be used for capture");
+    check_true(capability.capabilities & V4L2_CAP.STREAMING.(u32) != 0, "Device does not support streaming");
 
     // Set the desired width, height, and pixel format
     format : v4l2_format;
@@ -158,12 +158,6 @@ main :: () {
 
 check_ge_0 :: (value: s32, message: string) {
     if value >= 0 return;
-    print("ERROR: %.\n", message);
-    exit(0);
-}
-
-check_gt_0 :: (value: u32, message: string) {
-    if value > 0 return;
     print("ERROR: %.\n", message);
     exit(0);
 }
